@@ -190,20 +190,6 @@ class MaxHeap:
         if(max_idx != i):
             self.swap(max_idx, i)
             self.maxheapify(max_idx)
-        """
-        if (self.exists(i) and not self.leaf(i)):
-            lchild = self.heap[self.leftchild(i)]
-            rchild = self.heap[self.rightchild(i)]
-
-            if (self.heap[i] < lchild or self.heap[i] < rchild):
-                if (lchild > rchild):
-                    self.swap(i,self.leftchild(i))
-                    self.maxheapify(self.leftchild(i))
-
-                else:
-                    self.swap(i,self.rightchild(i))
-                    self.maxheapify(self.rightchild(i))
-        """
 
     def max(self):
 
@@ -307,26 +293,5 @@ class Prepartition(Solution):
             H.add(val)
 
         return kk(H)
-
-
-
-
-#Heap.add(5)
-##Heap.add(17)
-#Heap.add(10)
-#Heap.add(84)
-#Heap.add(19)
-#Heap.add(6)
-#Heap.add(22)
-#Heap.add(9)
-"""
-for j in range(25000):
-    Heap = MaxHeap(200)
-    for i in range(100):
-        Heap.add(random.randint(1,10**12))
-    kk(Heap)
-    if (j % 1000 == 0):
-        print(j)
-"""
 
 main()
