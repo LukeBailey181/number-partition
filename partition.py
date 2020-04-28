@@ -226,6 +226,7 @@ class Solution:
     def __init__(self):
         self.sequence = []
 
+    @staticmethod
     def randomSolution(sol_type):
         if sol_type == "signs":
             return SignSequence()
