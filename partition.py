@@ -11,7 +11,7 @@ COOLING_COEF = 10**10
 
 def main():
     args = sys.argv
-    flag, alg = int(args[1]), int(args[2])
+    flag, alg = int(args[1]), args[2]
     in_file = args[3] if len(args) > 3 else None
 
     if flag == 0:
@@ -19,21 +19,27 @@ def main():
     else:
         problem = storeNewProblem(in_file)
 
+    sol_type = "signs" if len(alg) == 1 else "prepartition"
+
+    alg = int(alg[len(alg)-1])
+
     if alg == 1: #implement other algs
-        print(repeatedRandom(problem))
+        print(repeatedRandom(problem, sol_type))
 
     elif alg == 2:
-        print(hillClimber(problem)[0])
+        print(hillClimber(problem, sol_type)[0])
 
     elif alg == 3:
-        print(simulatedAnnealing(problem)[0])
+        print(simulatedAnnealing(problem, sol_type)[0])
 
     else: #default to Karmarkar Karp
-        H = MaxHeap(PROBLEM_SIZE * 2)
+        H = MaxHeap(PROBLEM_SIZE)
         for val in problem:
             H.add(val)
 
         print(kk(H))
+
+
 
 def storeNewProblem(in_file="numbers.txt"):
     """
@@ -63,84 +69,63 @@ def generateProblem(in_file=None):
 
     return A
 
-def randSolution():
+def randSolution(sol_type="signs"):
     """
     Generate a random solution of signs
     """
-    return random.choices([-1, 1], k=PROBLEM_SIZE)
-
-def residue(problem=None, signs=None, heap=None):
-    """
-    generically get residue of a solution
-    params problem, signs provide one approach
-        lists of inputs and solution signs, respectively
-    param heap alternative if kk variation used
-        should have only one nonzero int rep. residue
-    """
-    res = 0
-    if heap is None:
-        for i in range(len(problem)):
-            res += problem[i] * signs[i]
-    else:
-        res = heap.max()
-
-    return abs(res)
-
-def getSignsNeighbor(sol):
-    """
-    get random neighbor from a solution composed of signs sequence
-    """
-    signs = sol[:] #don't want to change sol, just generate new list
-    i, j = random.sample(range(0, len(signs)), k=2)
-    signs[i] = -signs[i]
-    if random.choice([0, 1]) == 0:
-        signs[j] = -signs[j]
-
-    return signs
+    return Solution.randomSolution(sol_type)
 
 
-def repeatedRandom(problem):
+def kk(heap):
+    while (heap.size > 1):
+        value1 = heap.max()
+        value2 = heap.max()
+        dif = value1 - value2
+        heap.add(dif)
+    return(heap.max())
+
+def repeatedRandom(problem, sol_type="signs"):
     """
     repeatedly generate random solutions and return best
     """
-    S = randSolution()
-    minRes = residue(problem=problem, signs=S)
+    S = randSolution(sol_type)
+    minRes = S.residue(problem)
     for i in range(MAX_ITER):
-        S_prime = randSolution()
-        res_prime = residue(problem=problem, signs=S_prime)
+        S_prime = randSolution(sol_type)
+        res_prime = S_prime.residue(problem)
         if(res_prime < minRes):
             #S = S_prime #make assignment if needed for return
             minRes = res_prime
 
     return minRes
 
-def hillClimber(problem):
+def hillClimber(problem, sol_type="signs"):
     """
     repeatedly generate improving random neighbors
     """
-    S = randSolution()
-    minRes = residue(problem=problem, signs=S)
+    S = randSolution(sol_type)
+    minRes = S.residue(problem)
     for i in range(MAX_ITER):
-        S_prime = getSignsNeighbor(S)
-        res_prime = residue(problem=problem, signs=S_prime)
+        S_prime = S.getNeighbor()
+        res_prime = S_prime.residue(problem)
         if(res_prime < minRes):
             minRes = res_prime
             S = S_prime
 
     return minRes, S
 
-def simulatedAnnealing(problem):
+def simulatedAnnealing(problem, sol_type="signs"):
     """
     move to neighbors, not necessarily better
     """
-    S = randSolution()
+    S = randSolution(sol_type)
     best = S
-    bestRes = residue(problem, S)
+    bestRes = S.residue(problem)
     curr_res = bestRes
     
     for i in range(MAX_ITER):
-        S_prime = getSignsNeighbor(S)
-        res_prime = residue(problem, S_prime)
+        S_prime = S.getNeighbor()
+        res_prime = S_prime.residue(problem)
         if res_prime < curr_res or random.random() < exp(-(res_prime - curr_res)/cooling(i)):
             S = S_prime
             curr_res = res_prime
@@ -168,55 +153,77 @@ class MaxHeap:
     def rightchild(self, i):
         return ((2 * i) + 2)
 
+    def children(self, i):
+        return self.leftchild(i), self.rightchild(i)
+
     def parentpos(self, i):
         return ((i-1)//2)
 
     def leaf(self, i):
-        if (i <= self.size and i >= self.size//2):
-            return True
-        else:
-            return False
+        return (i < self.size and i >= self.size//2-1)
+
+    def exists(self, i):
+        return (i < self.size and i >= 0)
 
     def swap(self, i, j):
-        a = self.heap[i]
-        b = self.heap[j]
-        self.heap[i] = b
-        self.heap[j] = a
+        self.heap[i], self.heap[j] = self.heap[j], self.heap[i] 
 
     def add(self, number):
         if self.size >= self.maxsize:
             return
         self.size += 1
-        index = self.size
+        index = self.size - 1
         self.heap[index] = number
 
-        while (self.heap[index] > self.heap[self.parentpos(index)]):
+        while (self.exists(self.parentpos(index)) and self.heap[index] > self.heap[self.parentpos(index)]):
             parent = self.parentpos(index)
             self.swap(index, parent)
             index = parent
 
-
     def maxheapify(self,i):
-        lchild = self.heap[self.leftchild(i)]
-        rchild = self.heap[self.rightchild(i)]
+        
+        l, r = self.children(i)
+        max_idx = l if self.exists(l) and self.heap[l] > self.heap[i] else i
+        if self.exists(r) and self.heap[r] > self.heap[max_idx]:
+            max_idx = r
 
-        if (not self.leaf(i) and (self.heap[i] < lchild or self.heap[i] < rchild)):
+        if(max_idx != i):
+            self.swap(max_idx, i)
+            self.maxheapify(max_idx)
+        """
+        if (self.exists(i) and not self.leaf(i)):
+            lchild = self.heap[self.leftchild(i)]
+            rchild = self.heap[self.rightchild(i)]
 
-            if (lchild > rchild):
-                self.swap(i,self.leftchild(i))
-                self.maxheapify(self.leftchild(i))
+            if (self.heap[i] < lchild or self.heap[i] < rchild):
+                if (lchild > rchild):
+                    self.swap(i,self.leftchild(i))
+                    self.maxheapify(self.leftchild(i))
 
-            else:
-                self.swap(i,self.rightchild(i))
-                self.maxheapify(self.rightchild(i))
+                else:
+                    self.swap(i,self.rightchild(i))
+                    self.maxheapify(self.rightchild(i))
+        """
 
     def max(self):
 
-        max = self.heap[0]
-        self.heap[0] = self.heap[self.size]
+        mx = self.heap[0]
+        self.heap[0] = self.heap[self.size - 1]
         self.size -= 1
         self.maxheapify(0)
-        return(max)
+        return(mx)
+
+    def isHeap(self):
+        for i in range(0, self.size):
+            l, r = self.children(i)
+            if(self.exists(l) and self.heap[l] > self.heap[i] or (self.exists(r) and self.heap[r] > self.heap[i])):
+                print("====================")
+                print("Not a heap")
+                print("Misplaced index at " + str(i))
+                self.Print()
+                print("====================")
+                return False
+        return True
 
     def Print(self):
         for i in range(1, (self.size//2)+1):
@@ -226,13 +233,82 @@ class MaxHeap:
     def raw_print(self):
         print(self.heap)
 
-def kk(heap):
-    while (heap.size > 1):
-        value1 = heap.max()
-        value2 = heap.max()
-        dif = value1 - value2
-        heap.add(dif)
-    return(heap.max())
+class Solution:
+    """
+    Abstract parent class for two solution types
+    """
+    def __init__(self):
+        self.sequence = []
+
+    def randomSolution(sol_type):
+        if sol_type == "signs":
+            return SignSequence()
+        elif sol_type == "prepartition":
+            return Prepartition()
+
+    def set(self, index, val):
+        self.sequence[index] = val
+
+
+class SignSequence(Solution):
+    """
+    Solution comprised of sequence of +-1 ints
+    """
+    def __init__(self, sequence=None):
+        if sequence is None:
+            self.sequence = random.choices([-1, 1], k=PROBLEM_SIZE)
+        else:
+            self.sequence = sequence[:]
+
+    def getNeighbor(self):
+        neighbor = SignSequence(self.sequence)
+        i, j = random.sample(range(0, len(self.sequence)), k=2)
+        neighbor.set(i, -self.sequence[i])
+        if random.random() < 0.5:
+            neighbor.set(j, -self.sequence[j])
+
+        return neighbor
+
+    def residue(self, problem):
+        res = 0
+        for i in range(len(problem)):
+            res += problem[i] * self.sequence[i]
+
+        return abs(res)
+
+class Prepartition(Solution):
+    """
+    Solution comprised of prepartition
+    """
+    def __init__(self, sequence=None):
+        if sequence is None:
+            self.sequence = random.choices(range(0, PROBLEM_SIZE), k=PROBLEM_SIZE)
+        else:
+            self.sequence = sequence[:]
+
+    def getNeighbor(self):
+        neighbor = Prepartition(self.sequence)
+        while(True):
+            i, j = random.choices(range(0, len(self.sequence)), k=2)
+            if(self.sequence[i] != j):
+                neighbor.set(i, j)
+                break
+
+        return neighbor
+
+    def residue(self, problem):
+        partitioned = [0] * len(problem)
+        for i in range(len(problem)):
+            p_index = self.sequence[i]
+            partitioned[p_index] += problem[i]
+
+        H = MaxHeap(200)
+        for val in partitioned:
+            H.add(val)
+
+        return kk(H)
+
+
 
 
 #Heap.add(5)
